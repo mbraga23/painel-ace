@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACE Lagoa Santa — Painel v2.1</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #06090f;
+  --bg-secondary: #0c1220;
+  --bg-card: #111a2e;
+  --bg-card-hover: #162038;
+  --bg-card-alt: #0f1729;
+  --border: #1e2d4a;
+  --border-light: #253553;
+  --text-primary: #e4eaf6;
+  --text-secondary: #8a9dc0;
+  --text-muted: #4e6488;
+  --accent-blue: #4f8ff7;
+  --accent-cyan: #22d3ee;
+  --accent-green: #34d399;
+  --accent-amber: #fbbf24;
+  --accent-red: #f87171;
+  --accent-purple: #a78bfa;
+  --accent-pink: #f472b6;
+  --accent-orange: #fb923c;
+  --glow-blue: rgba(79,143,247,0.1);
+  --glow-green: rgba(52,211,153,0.1);
+  --glow-red: rgba(248,113,113,0.1);
+  --glow-amber: rgba(251,191,36,0.1);
+  --glow-purple: rgba(167,139,250,0.1);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --font: 'DM Sans', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--font); background:var(--bg-primary); color:var(--text-primary); min-height:100vh; overflow-x:hidden; }
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-track { background:var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* ===== LOGIN ===== */
+.login-overlay { position:fixed; inset:0; z-index:1000; background:var(--bg-primary); display:flex; align-items:center; justify-content:center; transition:opacity .5s,visibility .5s; }
+.login-overlay.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+.login-box { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:48px; width:90%; max-width:460px; text-align:center; box-shadow:var(--shadow-lg); }
+.login-logo { width:80px; height:80px; margin:0 auto 20px; border-radius:22px; background:linear-gradient(135deg,#1e3a5f,#0c1f3a); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:38px; }
+.login-box h1 { font-size:22px; font-weight:700; margin-bottom:4px; letter-spacing:-0.02em; }
+.login-box .subtitle { color:var(--text-muted); font-size:13px; margin-bottom:32px; }
+.login-box label { display:block; text-align:left; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:5px; }
+.login-box input { width:100%; padding:11px 14px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-primary); font-family:var(--mono); font-size:12px; margin-bottom:16px; outline:none; transition:border-color .2s; }
+.login-box input:focus { border-color:var(--accent-blue); }
+.login-box input::placeholder { color:var(--text-muted); }
+.btn-connect { width:100%; padding:13px; background:linear-gradient(135deg,var(--accent-blue),#2563eb); border:none; border-radius:var(--radius-sm); color:#fff; font-family:var(--font); font-size:14px; font-weight:600; cursor:pointer; transition:transform .12s,box-shadow .2s; letter-spacing:-.01em; }
+.btn-connect:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(79,143,247,.35); }
+.btn-connect:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+.login-error { margin-top:14px; padding:10px; background:var(--glow-red); border:1px solid rgba(248,113,113,.25); border-radius:var(--radius-xs); color:var(--accent-red); font-size:12px; display:none; }
+.login-hint { margin-top:20px; font-size:11px; color:var(--text-muted); line-height:1.5; }
+
+/* ===== HEADER ===== */
+.header { background:var(--bg-secondary); border-bottom:1px solid var(--border); padding:0 28px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; backdrop-filter:blur(16px); }
+.header-left { display:flex; align-items:center; gap:12px; }
+.header-icon { width:32px; height:32px; background:linear-gradient(135deg,#1e3a5f,#0c1f3a); border:1px solid var(--border); border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.header h1 { font-size:15px; font-weight:600; letter-spacing:-.01em; }
+.header h1 span { color:var(--text-muted); font-weight:400; margin-left:4px; }
+.header-right { display:flex; align-items:center; gap:12px; }
+.live-dot { width:6px; height:6px; border-radius:50%; background:var(--accent-green); animation:pulse 2s infinite; display:inline-block; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.header-meta { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+.btn-sm { padding:6px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xs); color:var(--text-secondary); font-family:var(--font); font-size:12px; cursor:pointer; transition:all .15s; }
+.btn-sm:hover { background:var(--bg-card-hover); color:var(--text-primary); border-color:var(--border-light); }
+
+/* ===== TABS ===== */
+.tabs-wrap { background:var(--bg-secondary); border-bottom:1px solid var(--border); padding:0 28px; overflow-x:auto; }
+.tabs { display:flex; gap:2px; }
+.tab { padding:11px 18px; font-size:12px; font-weight:500; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; font-family:var(--font); white-space:nowrap; letter-spacing:-.01em; }
+.tab:hover { color:var(--text-secondary); }
+.tab.active { color:var(--accent-blue); border-bottom-color:var(--accent-blue); }
+
+/* ===== MAIN ===== */
+.main { padding:20px 28px 40px; max-width:1480px; margin:0 auto; }
+.tab-content { display:none; }
+.tab-content.active { display:block; animation:fadeUp .35s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+/* ===== FILTERS ===== */
+.filters { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
+.filter-group { display:flex; flex-direction:column; gap:3px; }
+.filter-group label { font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
+.filter-group select, .filter-group input[type="date"] { padding:7px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-xs); color:var(--text-primary); font-family:var(--font); font-size:12px; outline:none; }
+.filter-group select:focus, .filter-group input:focus { border-color:var(--accent-blue); }
+.btn-filter { padding:7px 16px; background:var(--accent-blue); border:none; border-radius:var(--radius-xs); color:#fff; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font); }
+
+/* ===== KPI ===== */
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+.kpi { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; position:relative; overflow:hidden; transition:border-color .2s; }
+.kpi:hover { border-color:var(--border-light); }
+.kpi::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.kpi:nth-child(1)::after{background:var(--accent-blue)} .kpi:nth-child(2)::after{background:var(--accent-green)} .kpi:nth-child(3)::after{background:var(--accent-amber)} .kpi:nth-child(4)::after{background:var(--accent-red)} .kpi:nth-child(5)::after{background:var(--accent-purple)} .kpi:nth-child(6)::after{background:var(--accent-cyan)}
+.kpi-icon { font-size:20px; margin-bottom:10px; }
+.kpi-label { font-size:11px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+.kpi-value { font-size:28px; font-weight:700; font-family:var(--mono); line-height:1; letter-spacing:-.02em; }
+.kpi-sub { font-size:11px; color:var(--text-secondary); margin-top:5px; }
+
+/* ===== PANELS ===== */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+@media(max-width:1000px) { .grid-2,.grid-3{grid-template-columns:1fr} .main{padding:14px} .header,.tabs-wrap{padding:0 14px} .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))} }
+.full { grid-column:1/-1; }
+
+.panel { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.panel-head { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.panel-head h3 { font-size:13px; font-weight:600; display:flex; align-items:center; gap:7px; letter-spacing:-.01em; }
+.panel-head .meta { font-size:11px; color:var(--text-muted); }
+.panel-body { padding:18px; }
+.panel-body canvas { max-height:300px; }
+
+/* ===== MAP ===== */
+#mapa-calor { height:520px; width:100%; }
+.leaflet-container { background:var(--bg-secondary)!important; }
+.map-legend { position:absolute; bottom:20px; right:20px; z-index:999; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; font-size:11px; }
+.map-legend-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.map-legend-dot { width:10px; height:10px; border-radius:50%; }
+
+/* ===== TABLES ===== */
+.tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.tbl thead th { text-align:left; padding:9px 12px; font-size:10px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid var(--border); white-space:nowrap; }
+.tbl tbody td { padding:10px 12px; border-bottom:1px solid rgba(30,45,74,.5); color:var(--text-secondary); }
+.tbl tbody tr:hover td { background:var(--bg-card-hover); color:var(--text-primary); }
+.tbl tbody tr:last-child td { border-bottom:none; }
+
+.badge { display:inline-flex; padding:2px 9px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:.02em; }
+.badge-blue { background:var(--glow-blue); color:var(--accent-blue); }
+.badge-green { background:var(--glow-green); color:var(--accent-green); }
+.badge-amber { background:var(--glow-amber); color:var(--accent-amber); }
+.badge-red { background:var(--glow-red); color:var(--accent-red); }
+.badge-purple { background:var(--glow-purple); color:var(--accent-purple); }
+
+.rank { display:inline-flex; width:22px; height:22px; align-items:center; justify-content:center; border-radius:6px; font-size:11px; font-weight:700; font-family:var(--mono); }
+.rank-1 { background:linear-gradient(135deg,#fbbf24,#d97706); color:#000; }
+.rank-2 { background:linear-gradient(135deg,#94a3b8,#475569); color:#fff; }
+.rank-3 { background:linear-gradient(135deg,#d97706,#92400e); color:#fff; }
+.rank-n { background:var(--bg-secondary); color:var(--text-muted); }
+
+/* ===== TERRITORY CARDS ===== */
+.terr-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; margin-bottom:20px; }
+.terr-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; position:relative; overflow:hidden; }
+.terr-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan)); }
+.terr-number { font-family:var(--mono); font-size:40px; font-weight:700; color:var(--accent-blue); opacity:.15; position:absolute; top:8px; right:16px; }
+.terr-title { font-size:15px; font-weight:700; margin-bottom:4px; }
+.terr-agent { font-size:12px; color:var(--text-secondary); margin-bottom:14px; }
+.terr-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.terr-stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
+.terr-stat-val { font-size:18px; font-weight:700; font-family:var(--mono); }
+.terr-bar { height:5px; background:var(--bg-secondary); border-radius:3px; margin-top:14px; overflow:hidden; }
+.terr-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan)); transition:width .5s; }
+
+/* ===== COMPARISON TABLE ===== */
+.compare-highlight { background:rgba(79,143,247,.08)!important; }
+
+/* ===== LOADING / EMPTY ===== */
+.loading { display:flex; align-items:center; justify-content:center; padding:50px; color:var(--text-muted); font-size:13px; gap:8px; }
+.spinner { width:18px; height:18px; border:2px solid var(--border); border-top-color:var(--accent-blue); border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.empty { text-align:center; padding:40px; color:var(--text-muted); font-size:13px; }
+
+/* ===== VERSION BADGE ===== */
+.version { position:fixed; bottom:12px; right:16px; font-size:10px; color:var(--text-muted); opacity:.5; font-family:var(--mono); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🦟</div>
+    <h1>ACE Lagoa Santa</h1>
+    <p class="subtitle">Painel de Monitoramento v2.1</p>
+    <label>URL do Projeto Supabase</label>
+    <input type="text" id="inputUrl" placeholder="https://xyzabc.supabase.co" />
+    <label>Anon Key (Legacy — eyJ...)</label>
+    <input type="password" id="inputKey" placeholder="eyJhbGciOiJIUzI1NiIs..." />
+    <button class="btn-connect" id="btnConnect" onclick="conectar()">Conectar ao Painel</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-hint">As credenciais ficam salvas apenas no seu navegador.<br>Encontre em: Supabase → Settings → API → Legacy keys</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="header" style="display:none" id="appHeader">
+  <div class="header-left">
+    <div class="header-icon">🦟</div>
+    <h1>ACE Lagoa Santa<span>Painel v2.1</span></h1>
+  </div>
+  <div class="header-right">
+    <div class="header-meta"><span class="live-dot"></span> Conectado</div>
+    <span class="header-meta" id="lastUpdate"></span>
+    <button class="btn-sm" onclick="carregarTudo()">↻ Atualizar</button>
+    <button class="btn-sm" onclick="desconectar()">Sair</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs-wrap" style="display:none" id="appTabs">
+  <div class="tabs">
+    <button class="tab active" data-tab="visao-geral">📊 Visão Geral</button>
+    <button class="tab" data-tab="territorios">🏘️ Territórios</button>
+    <button class="tab" data-tab="agentes">👤 Agentes</button>
+    <button class="tab" data-tab="mapa">🗺️ Mapa de Calor</button>
+    <button class="tab" data-tab="depositos">🪣 Depósitos</button>
+    <button class="tab" data-tab="pendencias">⚠️ Pendências</button>
+    <button class="tab" data-tab="visitas">📋 Visitas</button>
+    <button class="tab" data-tab="indicadores">🐾 Indicadores Extra</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="main" style="display:none" id="appMain">
+
+  <!-- ==================== VISÃO GERAL ==================== -->
+  <div class="tab-content active" id="tab-visao-geral">
+    <div class="filters">
+      <div class="filter-group"><label>Data Início</label><input type="date" id="filterDataInicio"></div>
+      <div class="filter-group"><label>Data Fim</label><input type="date" id="filterDataFim"></div>
+      <div class="filter-group"><label>Agente</label><select id="filterAgente"><option value="">Todos</option></select></div>
+      <div class="filter-group"><label>Território</label><select id="filterTerritorio"><option value="">Todos</option></select></div>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="kpi"><div class="kpi-icon">📋</div><div class="kpi-label">Total Visitas</div><div class="kpi-value" id="kpiVisitas">—</div><div class="kpi-sub" id="kpiVisitasSub"></div></div>
+      <div class="kpi"><div class="kpi-icon">🏘️</div><div class="kpi-label">Quarteirões</div><div class="kpi-value" id="kpiQuarteiroes">—</div></div>
+      <div class="kpi"><div class="kpi-icon">🪣</div><div class="kpi-label">Depósitos</div><div class="kpi-value" id="kpiDepositos">—</div></div>
+      <div class="kpi"><div class="kpi-icon">🚫</div><div class="kpi-label">Recusas</div><div class="kpi-value" id="kpiRecusas">—</div></div>
+      <div class="kpi"><div class="kpi-icon">🔒</div><div class="kpi-label">Fechados</div><div class="kpi-value" id="kpiFechados">—</div></div>
+      <div class="kpi"><div class="kpi-icon">👥</div><div class="kpi-label">Agentes</div><div class="kpi-value" id="kpiAgentes">—</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>📈 Visitas por Dia</h3></div><div class="panel-body"><canvas id="chartVisitasDia"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>🏠 Tipos de Imóvel</h3></div><div class="panel-body"><canvas id="chartTiposImovel"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>🪣 Depósitos por Tipo</h3></div><div class="panel-body"><canvas id="chartDepositosTipo"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>🏆 Ranking — Visitas por Agente</h3></div><div class="panel-body"><canvas id="chartRankingAgentes"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ==================== TERRITÓRIOS ==================== -->
+  <div class="tab-content" id="tab-territorios">
+    <div style="margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Comparativo entre Territórios</h2>
+      <p style="font-size:13px;color:var(--text-secondary)">Análise lado a lado do desempenho de cada território</p>
+    </div>
+
+    <!-- Territory Cards -->
+    <div class="terr-grid" id="terrGrid"></div>
+
+    <!-- Comparison Charts -->
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>📊 Visitas por Território</h3></div><div class="panel-body"><canvas id="chartTerrVisitas"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>🪣 Depósitos por Território</h3></div><div class="panel-body"><canvas id="chartTerrDepositos"></canvas></div></div>
+    </div>
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>🚫 Pendências por Território</h3></div><div class="panel-body"><canvas id="chartTerrPendencias"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>📈 Eficiência — Visitas vs Depósitos</h3></div><div class="panel-body"><canvas id="chartTerrEficiencia"></canvas></div></div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="panel">
+      <div class="panel-head"><h3>📋 Tabela Comparativa Completa</h3></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl" id="tblTerritorios">
+          <thead>
+            <tr>
+              <th>Território</th>
+              <th>Agente</th>
+              <th>Visitas</th>
+              <th>Quarteirões</th>
+              <th>Depósitos</th>
+              <th>Recusas</th>
+              <th>Fechados</th>
+              <th>% Recusa</th>
+              <th>Dep/Visita</th>
+              <th>Última Atividade</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTerritorios"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== AGENTES ==================== -->
+  <div class="tab-content" id="tab-agentes">
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="panel"><div class="panel-head"><h3>🏆 Ranking Geral de Visitas</h3></div><div class="panel-body"><canvas id="chartAgentesRank"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>⏱️ Produtividade — Visitas por Dia Trabalhado</h3></div><div class="panel-body"><canvas id="chartAgentesProd"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>👤 Desempenho Detalhado</h3></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>Nome</th><th>Território</th><th>Visitas</th><th>Quarteirões</th><th>Depósitos</th><th>Recusas</th><th>Fechados</th><th>Dep/Visita</th><th>Última Visita</th></tr></thead>
+          <tbody id="tbodyAgentes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAPA ==================== -->
+  <div class="tab-content" id="tab-mapa">
+    <div class="panel" style="position:relative">
+      <div class="panel-head">
+        <h3>🗺️ Mapa de Achados — Depósitos e Larvas</h3>
+        <div class="meta" id="mapaCount"></div>
+      </div>
+      <div id="mapa-calor"></div>
+      <div class="map-legend" id="mapLegend">
+        <div style="font-weight:600;margin-bottom:6px">Legenda</div>
+        <div class="map-legend-row"><div class="map-legend-dot" style="background:#f87171"></div> Larva/Ovo positivo</div>
+        <div class="map-legend-row"><div class="map-legend-dot" style="background:#a78bfa"></div> Tratado/Larvicida</div>
+        <div class="map-legend-row"><div class="map-legend-dot" style="background:#fbbf24"></div> Só depósitos</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== DEPÓSITOS ==================== -->
+  <div class="tab-content" id="tab-depositos">
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>🪣 Inspecionados vs Eliminados vs Tratados</h3></div><div class="panel-body"><canvas id="chartDepDetalhado"></canvas></div></div>
+      <div class="panel"><div class="panel-head"><h3>📊 Proporção de Ações</h3></div><div class="panel-body"><canvas id="chartDepAcao"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>🦟 Depósitos com Espécimes por Resumo Semanal</h3></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Agente</th><th>SE</th><th>Aeg A1</th><th>Aeg A2</th><th>Aeg B</th><th>Aeg C</th><th>Aeg D1</th><th>Aeg D2</th><th>Aeg E</th><th>Albopictus</th></tr></thead>
+          <tbody id="tbodyEspecimes"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PENDÊNCIAS ==================== -->
+  <div class="tab-content" id="tab-pendencias">
+    <div class="grid-2">
+      <div class="panel"><div class="panel-head"><h3>📊 Pendências por Tipo</h3></div><div class="panel-body"><canvas id="chartPendencias"></canvas></div></div>
+      <div class="panel">
+        <div class="panel-head"><h3>🏠 Top 20 — Ruas com Mais Recusas</h3></div>
+        <div class="panel-body" style="padding:0;overflow-x:auto">
+          <table class="tbl"><thead><tr><th>#</th><th>Logradouro</th><th>Território</th><th>Recusas</th></tr></thead><tbody id="tbodyRecusas"></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>📈 Evolução de Pendências por Semana</h3></div>
+      <div class="panel-body"><canvas id="chartPendSemana"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ==================== VISITAS ==================== -->
+  <div class="tab-content" id="tab-visitas">
+    <div class="panel">
+      <div class="panel-head"><h3>📋 Registro de Visitas</h3><div class="meta" id="visitasCount"></div></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Data</th><th>Agente</th><th>Logradouro</th><th>Nº</th><th>Tipo</th><th>Qteirão</th><th>Depósitos</th><th>Status</th><th>GPS</th></tr></thead>
+          <tbody id="tbodyVisitas"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== INDICADORES EXTRA ==================== -->
+  <div class="tab-content" id="tab-indicadores">
+    <div style="margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">🐾 Indicadores Extra</h2>
+      <p style="font-size:13px;color:var(--text-secondary)">Pets, acumuladores e horários de visita</p>
+    </div>
+
+    <!-- KPIs Indicadores -->
+    <div class="kpi-grid" id="kpiIndicadores">
+      <div class="kpi"><div class="kpi-icon">🐾</div><div class="kpi-label">Imóveis com Pets</div><div class="kpi-value" id="kpiPets">—</div><div class="kpi-sub" id="kpiPetsSub"></div></div>
+      <div class="kpi"><div class="kpi-icon">🐕</div><div class="kpi-label">Com Cães</div><div class="kpi-value" id="kpiCaes">—</div></div>
+      <div class="kpi"><div class="kpi-icon">🐈</div><div class="kpi-label">Com Gatos</div><div class="kpi-value" id="kpiGatos">—</div></div>
+      <div class="kpi"><div class="kpi-icon">📦</div><div class="kpi-label">Acumuladores</div><div class="kpi-value" id="kpiAcumuladores">—</div><div class="kpi-sub" id="kpiAcumSub"></div></div>
+      <div class="kpi"><div class="kpi-icon">⏱️</div><div class="kpi-label">Tempo Médio/Visita</div><div class="kpi-value" id="kpiTempoMedio">—</div><div class="kpi-sub">minutos</div></div>
+      <div class="kpi"><div class="kpi-icon">🕐</div><div class="kpi-label">Visitas c/ Horário</div><div class="kpi-value" id="kpiComHorario">—</div></div>
+    </div>
+
+    <!-- Charts row 1: Pets -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>🐾 Distribuição de Pets por Tipo</h3></div>
+        <div class="panel-body"><canvas id="chartPetsTipo"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>📊 Pets por Território</h3></div>
+        <div class="panel-body"><canvas id="chartPetsTerritorios"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Charts row 2: Acumuladores + Horários -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>📦 Acumuladores por Território</h3></div>
+        <div class="panel-body"><canvas id="chartAcumTerritorios"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>⏱️ Distribuição de Horários de Visita</h3></div>
+        <div class="panel-body"><canvas id="chartHorarios"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Charts row 3: Tempo médio + Evolução -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head"><h3>⏱️ Tempo Médio por Agente</h3></div>
+        <div class="panel-body"><canvas id="chartTempoAgente"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>📈 Evolução — Pets e Acumuladores por Mês</h3></div>
+        <div class="panel-body"><canvas id="chartEvolucaoExtras"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tabela: Acumuladores detalhados -->
+    <div class="panel">
+      <div class="panel-head"><h3>📦 Imóveis Acumuladores Registrados</h3><div class="meta" id="acumCount"></div></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Data</th><th>Agente</th><th>Logradouro</th><th>Nº</th><th>Território</th><th>Pets</th><th>Depósitos</th><th>GPS</th></tr></thead>
+          <tbody id="tbodyAcumuladores"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tabela: Top ruas com pets -->
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head"><h3>🐾 Top 15 — Ruas com Mais Pets</h3></div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>Logradouro</th><th>Território</th><th>Total Pets</th><th>Cães</th><th>Gatos</th></tr></thead>
+          <tbody id="tbodyTopPets"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="version">ACE Painel v2.1</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let sb=null, cache={agentes:[],visitas:[],registros:[],resumos:[],stats:[],mapa:[],recusas:[],indicadores:[]};
+let leafMap=null, heatLyr=null, markers=[], charts={};
+const COLORS=['#4f8ff7','#34d399','#fbbf24','#f87171','#a78bfa','#22d3ee','#fb923c','#f472b6','#6ee7b7','#fde68a'];
+
+// ============================================================
+// AUTH
+// ============================================================
+async function conectar(){
+  const url=gv('inputUrl').trim(), key=gv('inputKey').trim(), btn=ge('btnConnect'), err=ge('loginError');
+  if(!url||!key){showErr('Preencha URL e Key');return}
+  btn.disabled=true; btn.textContent='Conectando...'; err.style.display='none';
+  try{
+    sb=window.supabase.createClient(url,key);
+    const{error}=await sb.from('agentes').select('id').limit(1);
+    if(error)throw error;
+    localStorage.setItem('ace_url',url); localStorage.setItem('ace_key',key);
+    ge('loginOverlay').classList.add('hidden');
+    ['appHeader','appTabs','appMain'].forEach(id=>ge(id).style.display=id==='appHeader'?'flex':id==='appTabs'?'block':'block');
+    await carregarTudo();
+  }catch(e){showErr('Erro: '+(e.message||e))}
+  finally{btn.disabled=false;btn.textContent='Conectar ao Painel'}
+}
+function desconectar(){localStorage.removeItem('ace_url');localStorage.removeItem('ace_key');location.reload()}
+function showErr(m){const e=ge('loginError');e.textContent=m;e.style.display='block'}
+(function(){const u=localStorage.getItem('ace_url'),k=localStorage.getItem('ace_key');if(u&&k){ge('inputUrl').value=u;ge('inputKey').value=k;conectar()}})();
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function carregarTudo(){
+  ge('lastUpdate').textContent='Carregando...';
+  try{
+    const safe=async(p)=>{try{const r=await p;return r}catch(e){console.warn('Query falhou:',e);return{data:[]}}};
+    const[a,v,r,rs,st,mc,rc,ie]=await Promise.all([
+      safe(sb.from('agentes').select('*')),
+      safe(sb.from('visitas').select('*').order('data_criacao',{ascending:false}).limit(2000)),
+      safe(sb.from('registros_diarios').select('*')),
+      safe(sb.from('resumos_semanais').select('*')),
+      safe(sb.from('view_stats_agente').select('*')),
+      safe(sb.from('view_mapa_calor').select('*')),
+      safe(sb.from('view_ranking_recusas').select('*')),
+      safe(sb.from('view_indicadores_extras').select('*')),
+    ]);
+    cache={agentes:a.data||[],visitas:v.data||[],registros:r.data||[],resumos:rs.data||[],stats:st.data||[],mapa:mc.data||[],recusas:rc.data||[],indicadores:ie.data||[]};
+
+    // Enrich visitas with agente info
+    const rm={};
+    cache.registros.forEach(r=>{const ag=cache.agentes.find(a=>a.id===r.agente_id);rm[r.id]={...r,_nome:ag?.nome||'—',_terr:ag?.territorio_numero}});
+    cache.visitas.forEach(v=>{const r=rm[v.registro_diario_id];if(r){v._nome=r._nome;v._terr=r._terr;v._data=r.data}});
+
+    popularFiltros();
+    ge('lastUpdate').textContent=`${new Date().toLocaleTimeString('pt-BR')}`;
+    renderAll();
+  }catch(e){console.error(e);ge('lastUpdate').textContent='Erro ao carregar!'}
+}
+
+function renderAll(){
+  [renderVisaoGeral,renderTerritorios,renderAgentes,renderMapa,renderDepositos,renderPendencias,renderVisitas,renderIndicadores]
+    .forEach(fn=>{try{fn()}catch(e){console.error('[render] '+fn.name+':',e)}});
+}
+
+// ============================================================
+// FILTERS
+// ============================================================
+function popularFiltros(){
+  const sa=ge('filterAgente'),st=ge('filterTerritorio');
+  sa.innerHTML='<option value="">Todos</option>';
+  st.innerHTML='<option value="">Todos</option>';
+  cache.agentes.forEach(a=>{sa.innerHTML+=`<option value="${a.id}">${a.nome}</option>`});
+  const terrs=[...new Set(cache.agentes.map(a=>a.territorio_numero).filter(Boolean))].sort((a,b)=>a-b);
+  terrs.forEach(t=>{st.innerHTML+=`<option value="${t}">Território ${t}</option>`});
+}
+
+function filtrar(){
+  const ini=gv('filterDataInicio'),fim=gv('filterDataFim'),ag=gv('filterAgente'),tr=gv('filterTerritorio');
+  let v=[...cache.visitas];
+  if(ini)v=v.filter(x=>(x.data_criacao||'')>=ini);
+  if(fim)v=v.filter(x=>(x.data_criacao||'')<=fim+'T23:59:59');
+  if(ag){const rids=cache.registros.filter(r=>r.agente_id===ag).map(r=>r.id);v=v.filter(x=>rids.includes(x.registro_diario_id))}
+  if(tr){const aids=cache.agentes.filter(a=>a.territorio_numero==tr).map(a=>a.id);const rids=cache.registros.filter(r=>aids.includes(r.agente_id)).map(r=>r.id);v=v.filter(x=>rids.includes(x.registro_diario_id))}
+  return v;
+}
+document.addEventListener('change',e=>{if(e.target.closest('.filters'))renderVisaoGeral()});
+
+// ============================================================
+// VISÃO GERAL
+// ============================================================
+function renderVisaoGeral(){
+  const v=filtrar();
+  const dep=v.reduce((s,x)=>s+tDep(x),0);
+  const rec=v.filter(x=>x.pendencia_recusa).length;
+  const fch=v.filter(x=>x.pendencia_fechado).length;
+  const qt=new Set(v.filter(x=>x.fim_quarteirao).map(x=>x.quarteirao_numero+'_'+x.registro_diario_id)).size;
+  const ags=new Set(cache.registros.map(r=>r.agente_id)).size;
+
+  anim('kpiVisitas',v.length);anim('kpiQuarteiroes',qt);anim('kpiDepositos',dep);anim('kpiRecusas',rec);anim('kpiFechados',fch);anim('kpiAgentes',ags);
+
+  // Visitas por dia
+  const pd={};v.forEach(x=>{const d=(x.data_criacao||'').substring(0,10);if(d)pd[d]=(pd[d]||0)+1});
+  const dias=Object.keys(pd).sort();
+  chart('chartVisitasDia','line',{labels:dias.map(fmtD),datasets:[{label:'Visitas',data:dias.map(d=>pd[d]),borderColor:'#4f8ff7',backgroundColor:'rgba(79,143,247,.1)',fill:true,tension:.3,pointRadius:2}]});
+
+  // Tipos imóvel
+  const tp={Residencial:v.filter(x=>x.tipo_residencial).length,Comércio:v.filter(x=>x.tipo_comercio).length,'T. Baldio':v.filter(x=>x.tipo_terreno_baldio).length,'P. Estratégico':v.filter(x=>x.tipo_ponto_estrategico).length,Outros:v.filter(x=>x.tipo_outros).length};
+  chart('chartTiposImovel','doughnut',{labels:Object.keys(tp),datasets:[{data:Object.values(tp),backgroundColor:COLORS.slice(0,5),borderWidth:0}]},{cutout:'62%'});
+
+  // Depósitos por tipo
+  const dt={A1:sumF(v,'depositos_a1'),A2:sumF(v,'depositos_a2'),B:sumF(v,'depositos_b'),C:sumF(v,'depositos_c'),D1:sumF(v,'depositos_d1'),D2:sumF(v,'depositos_d2'),E:sumF(v,'depositos_e')};
+  chart('chartDepositosTipo','bar',{labels:Object.keys(dt),datasets:[{label:'Depósitos',data:Object.values(dt),backgroundColor:COLORS,borderWidth:0,borderRadius:5}]});
+
+  // Ranking agentes
+  const st=cache.stats.sort((a,b)=>(b.total_visitas||0)-(a.total_visitas||0));
+  chart('chartRankingAgentes','bar',{labels:st.map(s=>s.nome||'—'),datasets:[{label:'Visitas',data:st.map(s=>s.total_visitas||0),backgroundColor:st.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:0,borderRadius:5}]},{indexAxis:'y'});
+}
+
+// ============================================================
+// TERRITÓRIOS (NEW!)
+// ============================================================
+function renderTerritorios(){
+  const terrs=[...new Set(cache.agentes.map(a=>a.territorio_numero).filter(Boolean))].sort((a,b)=>a-b);
+  if(!terrs.length){ge('terrGrid').innerHTML='<div class="empty">Nenhum território cadastrado</div>';return}
+
+  // Build territory data
+  const tData=terrs.map(t=>{
+    const ags=cache.agentes.filter(a=>a.territorio_numero===t);
+    const aids=ags.map(a=>a.id);
+    const rids=cache.registros.filter(r=>aids.includes(r.agente_id)).map(r=>r.id);
+    const vis=cache.visitas.filter(v=>rids.includes(v.registro_diario_id));
+    const dep=vis.reduce((s,v)=>s+tDep(v),0);
+    const rec=vis.filter(v=>v.pendencia_recusa).length;
+    const fch=vis.filter(v=>v.pendencia_fechado).length;
+    const qt=new Set(vis.filter(v=>v.fim_quarteirao).map(v=>v.quarteirao_numero+'_'+v.registro_diario_id)).size;
+    const lastDate=vis.length?vis.reduce((m,v)=>v.data_criacao>m?v.data_criacao:m,''):'';
+    return{num:t,agentes:ags,nomes:ags.map(a=>a.nome).join(', '),visitas:vis.length,dep,rec,fch,qt,lastDate,recPct:vis.length?(rec/vis.length*100):0,depPerVis:vis.length?(dep/vis.length):0};
+  });
+
+  const maxVis=Math.max(...tData.map(t=>t.visitas),1);
+
+  // Cards
+  ge('terrGrid').innerHTML=tData.map(t=>`
+    <div class="terr-card">
+      <div class="terr-number">${t.num}</div>
+      <div class="terr-title">Território ${t.num}</div>
+      <div class="terr-agent">${t.nomes||'Sem agente'}</div>
+      <div class="terr-stats">
+        <div><div class="terr-stat-label">Visitas</div><div class="terr-stat-val">${t.visitas.toLocaleString('pt-BR')}</div></div>
+        <div><div class="terr-stat-label">Depósitos</div><div class="terr-stat-val">${t.dep.toLocaleString('pt-BR')}</div></div>
+        <div><div class="terr-stat-label">Recusas</div><div class="terr-stat-val" style="color:${t.rec>0?'var(--accent-red)':'inherit'}">${t.rec}</div></div>
+        <div><div class="terr-stat-label">Quarteirões</div><div class="terr-stat-val">${t.qt}</div></div>
+      </div>
+      <div class="terr-bar"><div class="terr-bar-fill" style="width:${(t.visitas/maxVis*100).toFixed(1)}%"></div></div>
+    </div>
+  `).join('');
+
+  // Chart: Visitas por território
+  chart('chartTerrVisitas','bar',{
+    labels:tData.map(t=>'Terr. '+t.num),
+    datasets:[{label:'Visitas',data:tData.map(t=>t.visitas),backgroundColor:tData.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:0,borderRadius:6}]
+  });
+
+  // Chart: Depósitos por território
+  chart('chartTerrDepositos','bar',{
+    labels:tData.map(t=>'Terr. '+t.num),
+    datasets:[
+      {label:'A1+A2',data:tData.map(t=>{const vis=getVisTerr(t.num);return sumF(vis,'depositos_a1')+sumF(vis,'depositos_a2')}),backgroundColor:'#f87171',borderRadius:4},
+      {label:'B',data:tData.map(t=>sumF(getVisTerr(t.num),'depositos_b')),backgroundColor:'#fbbf24',borderRadius:4},
+      {label:'C',data:tData.map(t=>sumF(getVisTerr(t.num),'depositos_c')),backgroundColor:'#34d399',borderRadius:4},
+      {label:'D1+D2',data:tData.map(t=>{const vis=getVisTerr(t.num);return sumF(vis,'depositos_d1')+sumF(vis,'depositos_d2')}),backgroundColor:'#4f8ff7',borderRadius:4},
+      {label:'E',data:tData.map(t=>sumF(getVisTerr(t.num),'depositos_e')),backgroundColor:'#a78bfa',borderRadius:4},
+    ]
+  },{scales:{x:{stacked:true},y:{stacked:true}}});
+
+  // Chart: Pendências por território
+  chart('chartTerrPendencias','bar',{
+    labels:tData.map(t=>'Terr. '+t.num),
+    datasets:[
+      {label:'Recusas',data:tData.map(t=>t.rec),backgroundColor:'#f87171',borderRadius:4},
+      {label:'Fechados',data:tData.map(t=>t.fch),backgroundColor:'#fbbf24',borderRadius:4},
+    ]
+  });
+
+  // Chart: Eficiência (scatter-like bar)
+  chart('chartTerrEficiencia','bar',{
+    labels:tData.map(t=>'Terr. '+t.num),
+    datasets:[
+      {label:'Dep/Visita',data:tData.map(t=>+t.depPerVis.toFixed(2)),backgroundColor:tData.map(t=>t.depPerVis>1?'#f87171':t.depPerVis>0.5?'#fbbf24':'#34d399'),borderRadius:6}
+    ]
+  },{plugins:{legend:{display:false}}});
+
+  // Comparison table
+  const tbody=ge('tbodyTerritorios');
+  const sorted=[...tData].sort((a,b)=>b.visitas-a.visitas);
+  tbody.innerHTML=sorted.map((t,i)=>`
+    <tr class="${i===0?'compare-highlight':''}">
+      <td><span class="badge badge-blue">Terr. ${t.num}</span></td>
+      <td>${t.nomes||'—'}</td>
+      <td style="font-family:var(--mono);font-weight:600">${t.visitas}</td>
+      <td>${t.qt}</td>
+      <td>${t.dep}</td>
+      <td>${t.rec?'<span class="badge badge-red">'+t.rec+'</span>':'0'}</td>
+      <td>${t.fch}</td>
+      <td><span class="badge ${t.recPct>10?'badge-red':t.recPct>5?'badge-amber':'badge-green'}">${t.recPct.toFixed(1)}%</span></td>
+      <td style="font-family:var(--mono)">${t.depPerVis.toFixed(2)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${t.lastDate?fmtD(t.lastDate.substring(0,10)):'—'}</td>
+    </tr>
+  `).join('');
+}
+
+function getVisTerr(num){
+  const aids=cache.agentes.filter(a=>a.territorio_numero===num).map(a=>a.id);
+  const rids=cache.registros.filter(r=>aids.includes(r.agente_id)).map(r=>r.id);
+  return cache.visitas.filter(v=>rids.includes(v.registro_diario_id));
+}
+
+// ============================================================
+// AGENTES
+// ============================================================
+function renderAgentes(){
+  const st=cache.stats.sort((a,b)=>(b.total_visitas||0)-(a.total_visitas||0));
+
+  // Ranking chart
+  chart('chartAgentesRank','bar',{
+    labels:st.map(s=>s.nome||'—'),
+    datasets:[{label:'Visitas',data:st.map(s=>s.total_visitas||0),backgroundColor:st.map((_,i)=>i===0?'#fbbf24':i===1?'#94a3b8':i===2?'#d97706':COLORS[i%COLORS.length]),borderWidth:0,borderRadius:5}]
+  },{indexAxis:'y'});
+
+  // Produtividade
+  const prod=st.map(s=>{
+    const resumos=cache.resumos.filter(r=>r.agente_id===s.agente_id);
+    const dias=resumos.reduce((sum,r)=>sum+(r.total_dias_trabalhados||0),0);
+    return{nome:s.nome,vpd:dias>0?((s.total_visitas||0)/dias):0};
+  }).sort((a,b)=>b.vpd-a.vpd);
+  chart('chartAgentesProd','bar',{
+    labels:prod.map(p=>p.nome||'—'),
+    datasets:[{label:'Visitas/Dia',data:prod.map(p=>+p.vpd.toFixed(1)),backgroundColor:prod.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:0,borderRadius:5}]
+  },{indexAxis:'y'});
+
+  // Table
+  const tbody=ge('tbodyAgentes');
+  if(!st.length){tbody.innerHTML='<tr><td colspan="10" class="empty">Nenhum agente</td></tr>';return}
+  tbody.innerHTML=st.map((s,i)=>{
+    const dpv=s.total_visitas?(s.total_depositos/s.total_visitas):0;
+    return`<tr>
+      <td><span class="rank ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span></td>
+      <td style="color:var(--text-primary);font-weight:500">${s.nome||'—'}</td>
+      <td><span class="badge badge-blue">${s.territorio_numero||'—'}</span></td>
+      <td style="font-family:var(--mono);font-weight:600">${s.total_visitas||0}</td>
+      <td>${s.quarteiroes_concluidos||0}</td>
+      <td>${s.total_depositos||0}</td>
+      <td>${s.total_recusas?'<span class="badge badge-red">'+s.total_recusas+'</span>':'0'}</td>
+      <td>${s.total_fechados||0}</td>
+      <td style="font-family:var(--mono)">${dpv.toFixed(2)}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${s.ultima_visita?fmtD(s.ultima_visita.substring(0,10)):'—'}</td>
+    </tr>`}).join('');
+}
+
+// ============================================================
+// MAPA
+// ============================================================
+let _mapaPts=[];
+
+const _larvaPositiva=v=>v.identidade_larva&&v.identidade_larva!=='nao_encontrado'&&v.identidade_larva!==null;
+const _temTratamento=v=>v.tratamento_tipos&&String(v.tratamento_tipos).trim().length>0;
+
+function _corMarcador(v){
+  if(_larvaPositiva(v))return'#f87171';   // vermelho — larva positiva
+  if(_temTratamento(v))return'#a78bfa';   // roxo — tratado
+  return'#fbbf24';                         // amarelo — só depósitos
+}
+
+function renderMapa(){
+  // Usa cache.visitas direto (tem mais campos que view_mapa_calor)
+  const comGPS=cache.visitas.filter(v=>v.latitude&&v.longitude);
+  // Filtra: só visitas com depósitos encontrados OU larva positiva
+  _mapaPts=comGPS.filter(v=>tDep(v)>0||_larvaPositiva(v));
+
+  const larvaCount=_mapaPts.filter(_larvaPositiva).length;
+  const tratCount=_mapaPts.filter(v=>!_larvaPositiva(v)&&_temTratamento(v)).length;
+  ge('mapaCount').textContent=`${_mapaPts.length} achados — ${larvaCount} positivos, ${tratCount} tratados`;
+
+  if(!leafMap){
+    leafMap=L.map('mapa-calor',{zoomControl:true}).setView([-19.6275,-43.8936],14);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'CartoDB',maxZoom:19}).addTo(leafMap);
+  }
+
+  // Só desenha se a aba estiver visível (canvas com largura > 0)
+  if(ge('tab-mapa').classList.contains('active')){
+    _renderMapaHeat();
+  }
+}
+
+function _renderMapaHeat(){
+  if(!leafMap)return;
+  if(heatLyr){leafMap.removeLayer(heatLyr);heatLyr=null;}
+  markers.forEach(m=>leafMap.removeLayer(m));markers=[];
+
+  if(!_mapaPts.length)return;
+
+  _mapaPts.forEach(v=>{
+    const dep=tDep(v);
+    const cor=_corMarcador(v);
+    const larva=_larvaPositiva(v);
+    const radius=larva?9:dep>4?7:dep>1?5:4;
+    const larvaLabel=larva?`<br>🦟 <b>${v.identidade_larva.replace('aedes_','Aedes ').replace(/_/g,' ')}</b>`:'';
+    const tratLabel=_temTratamento(v)?`<br>💊 Tratamento: ${v.tratamento_tipos}`:'';
+    const m=L.circleMarker([v.latitude,v.longitude],{
+      radius,color:cor,fillColor:cor,fillOpacity:.85,weight:2
+    }).addTo(leafMap).bindPopup(
+      `<b>${v.logradouro||'—'} ${v.numero||''}</b><br>`+
+      `Agente: ${v._nome||'—'}<br>`+
+      `Depósitos: ${dep}${larvaLabel}${tratLabel}<br>`+
+      `Data: ${v.data_criacao?fmtD(v.data_criacao.substring(0,10)):'—'}`
+    );
+    markers.push(m);
+  });
+
+  leafMap.fitBounds(_mapaPts.map(v=>[v.latitude,v.longitude]),{padding:[40,40]});
+  setTimeout(()=>leafMap&&leafMap.invalidateSize(),300);
+}
+
+// ============================================================
+// DEPÓSITOS
+// ============================================================
+function renderDepositos(){
+  const rs=cache.resumos, tipos=['a1','a2','b','c','d1','d2','e'];
+  const insp=tipos.map(t=>rs.reduce((s,r)=>s+(r['depositos_'+t]||0),0));
+  const elim=tipos.map(t=>rs.reduce((s,r)=>s+(r['depositos_eliminados_'+t]||0),0));
+  const trat=tipos.map(t=>rs.reduce((s,r)=>s+(r['depositos_tratados_'+t]||0),0));
+
+  chart('chartDepDetalhado','bar',{
+    labels:tipos.map(t=>t.toUpperCase()),
+    datasets:[
+      {label:'Inspecionados',data:insp,backgroundColor:'#4f8ff7',borderRadius:4},
+      {label:'Eliminados',data:elim,backgroundColor:'#34d399',borderRadius:4},
+      {label:'Tratados',data:trat,backgroundColor:'#fbbf24',borderRadius:4},
+    ]
+  });
+
+  chart('chartDepAcao','doughnut',{
+    labels:['Inspecionados','Eliminados','Tratados'],
+    datasets:[{data:[insp.reduce((a,b)=>a+b,0),elim.reduce((a,b)=>a+b,0),trat.reduce((a,b)=>a+b,0)],backgroundColor:['#4f8ff7','#34d399','#fbbf24'],borderWidth:0}]
+  },{cutout:'60%'});
+
+  const tbody=ge('tbodyEspecimes');
+  const rows=rs.filter(r=>(r.depositos_aedes_aegypti_a1||0)+(r.depositos_aedes_aegypti_a2||0)+(r.depositos_aedes_aegypti_b||0)+(r.depositos_aedes_albopictus_a1||0)>0);
+  tbody.innerHTML=rows.length?rows.map(r=>`<tr>
+    <td>${r.agente_nome||'—'}</td><td><span class="badge badge-blue">SE ${r.semana_epidemiologica}</span></td>
+    <td>${r.depositos_aedes_aegypti_a1||0}</td><td>${r.depositos_aedes_aegypti_a2||0}</td><td>${r.depositos_aedes_aegypti_b||0}</td>
+    <td>${r.depositos_aedes_aegypti_c||0}</td><td>${r.depositos_aedes_aegypti_d1||0}</td><td>${r.depositos_aedes_aegypti_d2||0}</td><td>${r.depositos_aedes_aegypti_e||0}</td>
+    <td>${['a1','a2','b','c','d1','d2','e'].reduce((s,t)=>s+(r['depositos_aedes_albopictus_'+t]||0),0)}</td>
+  </tr>`).join(''):'<tr><td colspan="10" class="empty">Nenhum espécime</td></tr>';
+}
+
+// ============================================================
+// PENDÊNCIAS
+// ============================================================
+function renderPendencias(){
+  const v=filtrar();
+  const data={Recusas:v.filter(x=>x.pendencia_recusa).length,Fechados:v.filter(x=>x.pendencia_fechado).length,Recuperados:v.filter(x=>x.imovel_recuperado).length,Larvicida:v.filter(x=>x.pendencia_larvicida).length,Armadilha:v.filter(x=>x.pendencia_armadilha).length};
+  chart('chartPendencias','bar',{labels:Object.keys(data),datasets:[{data:Object.values(data),backgroundColor:['#f87171','#fbbf24','#34d399','#a78bfa','#22d3ee'],borderWidth:0,borderRadius:6}]},{plugins:{legend:{display:false}}});
+
+  // Ranking recusas
+  const tbody=ge('tbodyRecusas');
+  const rk=cache.recusas.slice(0,20);
+  tbody.innerHTML=rk.length?rk.map((r,i)=>`<tr>
+    <td><span class="rank ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span></td>
+    <td style="color:var(--text-primary)">${r.logradouro}</td>
+    <td><span class="badge badge-blue">${r.territorio_numero||'—'}</span></td>
+    <td><span class="badge badge-red">${r.total_recusas}</span></td>
+  </tr>`).join(''):'<tr><td colspan="4" class="empty">Nenhuma recusa</td></tr>';
+
+  // Evolução semanal
+  const porSemana={};
+  v.forEach(x=>{
+    const d=(x.data_criacao||'').substring(0,10);
+    if(!d)return;
+    const dt=new Date(d);
+    const wk=d.substring(0,7); // simplify: by month
+    if(x.pendencia_recusa)porSemana[wk]={...porSemana[wk]||{rec:0,fch:0},rec:(porSemana[wk]?.rec||0)+1};
+    if(x.pendencia_fechado)porSemana[wk]={...porSemana[wk]||{rec:0,fch:0},fch:(porSemana[wk]?.fch||0)+1};
+  });
+  const semanas=Object.keys(porSemana).sort();
+  chart('chartPendSemana','line',{
+    labels:semanas,
+    datasets:[
+      {label:'Recusas',data:semanas.map(s=>porSemana[s]?.rec||0),borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.1)',fill:true,tension:.3,pointRadius:3},
+      {label:'Fechados',data:semanas.map(s=>porSemana[s]?.fch||0),borderColor:'#fbbf24',backgroundColor:'rgba(251,191,36,.1)',fill:true,tension:.3,pointRadius:3},
+    ]
+  });
+}
+
+// ============================================================
+// VISITAS
+// ============================================================
+function renderVisitas(){
+  const v=cache.visitas.slice(0,300);
+  ge('visitasCount').textContent=`${v.length} de ${cache.visitas.length}`;
+  const tbody=ge('tbodyVisitas');
+  if(!v.length){tbody.innerHTML='<tr><td colspan="9" class="empty">Nenhuma visita</td></tr>';return}
+  tbody.innerHTML=v.map(x=>{
+    const dep=tDep(x);
+    const tipo=x.tipo_residencial?'Resid.':x.tipo_comercio?'Comérc.':x.tipo_terreno_baldio?'T.Baldio':x.tipo_ponto_estrategico?'PE':'Outro';
+    const st=x.pendencia_recusa?'<span class="badge badge-red">Recusa</span>':x.pendencia_fechado?'<span class="badge badge-amber">Fechado</span>':'<span class="badge badge-green">OK</span>';
+    return`<tr>
+      <td style="white-space:nowrap;font-size:11px">${x.data_criacao?fmtD(x.data_criacao.substring(0,10)):'—'}</td>
+      <td>${x._nome||'—'}</td>
+      <td style="color:var(--text-primary)">${x.logradouro||'—'}</td>
+      <td>${x.numero||'—'}</td>
+      <td><span class="badge badge-blue">${tipo}</span></td>
+      <td>${x.quarteirao_numero||'—'}</td>
+      <td style="font-family:var(--mono)">${dep}</td>
+      <td>${st}</td>
+      <td>${x.latitude?'📍':'—'}</td>
+    </tr>`}).join('');
+}
+
+// ============================================================
+// INDICADORES EXTRA (Pets, Acumuladores, Horários)
+// ============================================================
+function renderIndicadores(){
+  const v=cache.visitas;
+
+  // === KPIs ===
+  const comPets=v.filter(x=>x.possui_pets).length;
+  const comCaes=v.filter(x=>x.pets_cao).length;
+  const comGatos=v.filter(x=>x.pets_gato).length;
+  const comOutrosPets=v.filter(x=>x.pets_outros&&x.pets_outros.trim()).length;
+  const acumuladores=v.filter(x=>x.acumulador).length;
+  const comHorario=v.filter(x=>x.hora_entrada&&x.hora_saida).length;
+
+  // Tempo médio de visita (em minutos)
+  let somaMin=0,countMin=0;
+  v.forEach(x=>{
+    if(!x.hora_entrada||!x.hora_saida)return;
+    try{
+      const[hE,mE]=(x.hora_entrada||'').split(':').map(Number);
+      const[hS,mS]=(x.hora_saida||'').split(':').map(Number);
+      const diff=(hS*60+mS)-(hE*60+mE);
+      if(diff>0&&diff<480){somaMin+=diff;countMin++}
+    }catch(e){}
+  });
+  const tempoMedio=countMin>0?Math.round(somaMin/countMin):0;
+
+  anim('kpiPets',comPets);
+  anim('kpiCaes',comCaes);
+  anim('kpiGatos',comGatos);
+  anim('kpiAcumuladores',acumuladores);
+  anim('kpiTempoMedio',tempoMedio);
+  anim('kpiComHorario',comHorario);
+
+  const pctPets=v.length>0?(comPets/v.length*100).toFixed(1):'0';
+  ge('kpiPetsSub').textContent=`${pctPets}% das visitas`;
+  const pctAcum=v.length>0?(acumuladores/v.length*100).toFixed(1):'0';
+  ge('kpiAcumSub').textContent=`${pctAcum}% das visitas`;
+
+  // === Chart: Distribuição de Pets por Tipo ===
+  chart('chartPetsTipo','doughnut',{
+    labels:['Cães','Gatos','Outros','Sem pets'],
+    datasets:[{
+      data:[comCaes,comGatos,comOutrosPets,v.length-comPets],
+      backgroundColor:['#fb923c','#a78bfa','#22d3ee','#1e2d4a'],
+      borderWidth:0
+    }]
+  },{cutout:'60%'});
+
+  // === Chart: Pets por Território ===
+  const terrNums=[...new Set(cache.agentes.map(a=>a.territorio_numero).filter(Boolean))].sort((a,b)=>a-b);
+  const petsPorTerr=terrNums.map(t=>{
+    const vis=getVisTerr(t);
+    return{num:t,pets:vis.filter(x=>x.possui_pets).length,caes:vis.filter(x=>x.pets_cao).length,gatos:vis.filter(x=>x.pets_gato).length};
+  });
+  chart('chartPetsTerritorios','bar',{
+    labels:petsPorTerr.map(t=>'Terr. '+t.num),
+    datasets:[
+      {label:'Cães',data:petsPorTerr.map(t=>t.caes),backgroundColor:'#fb923c',borderRadius:4},
+      {label:'Gatos',data:petsPorTerr.map(t=>t.gatos),backgroundColor:'#a78bfa',borderRadius:4},
+    ]
+  },{scales:{x:{stacked:true},y:{stacked:true}}});
+
+  // === Chart: Acumuladores por Território ===
+  const acumPorTerr=terrNums.map(t=>{
+    const vis=getVisTerr(t);
+    return{num:t,acum:vis.filter(x=>x.acumulador).length,total:vis.length};
+  });
+  chart('chartAcumTerritorios','bar',{
+    labels:acumPorTerr.map(t=>'Terr. '+t.num),
+    datasets:[{
+      label:'Acumuladores',
+      data:acumPorTerr.map(t=>t.acum),
+      backgroundColor:acumPorTerr.map(t=>t.acum>5?'#f87171':t.acum>2?'#fbbf24':'#34d399'),
+      borderWidth:0,borderRadius:6
+    }]
+  },{plugins:{legend:{display:false}}});
+
+  // === Chart: Distribuição de Horários de Visita ===
+  const faixas={'07-08':0,'08-09':0,'09-10':0,'10-11':0,'11-12':0,'12-13':0,'13-14':0,'14-15':0,'15-16':0,'16-17':0,'17+':0};
+  v.forEach(x=>{
+    if(!x.hora_entrada)return;
+    try{
+      const h=parseInt(x.hora_entrada.split(':')[0]);
+      if(h>=7&&h<8)faixas['07-08']++;
+      else if(h<9)faixas['08-09']++;
+      else if(h<10)faixas['09-10']++;
+      else if(h<11)faixas['10-11']++;
+      else if(h<12)faixas['11-12']++;
+      else if(h<13)faixas['12-13']++;
+      else if(h<14)faixas['13-14']++;
+      else if(h<15)faixas['14-15']++;
+      else if(h<16)faixas['15-16']++;
+      else if(h<17)faixas['16-17']++;
+      else faixas['17+']++;
+    }catch(e){}
+  });
+  chart('chartHorarios','bar',{
+    labels:Object.keys(faixas),
+    datasets:[{
+      label:'Visitas',data:Object.values(faixas),
+      backgroundColor:Object.values(faixas).map((_,i)=>COLORS[i%COLORS.length]),
+      borderWidth:0,borderRadius:5
+    }]
+  },{plugins:{legend:{display:false}}});
+
+  // === Chart: Tempo Médio por Agente ===
+  const tempoAgentes={};
+  v.forEach(x=>{
+    if(!x.hora_entrada||!x.hora_saida||!x._nome)return;
+    try{
+      const[hE,mE]=x.hora_entrada.split(':').map(Number);
+      const[hS,mS]=x.hora_saida.split(':').map(Number);
+      const diff=(hS*60+mS)-(hE*60+mE);
+      if(diff>0&&diff<480){
+        if(!tempoAgentes[x._nome])tempoAgentes[x._nome]={soma:0,count:0};
+        tempoAgentes[x._nome].soma+=diff;
+        tempoAgentes[x._nome].count++;
+      }
+    }catch(e){}
+  });
+  const agTempoArr=Object.entries(tempoAgentes).map(([nome,d])=>({nome,media:Math.round(d.soma/d.count)})).sort((a,b)=>b.media-a.media);
+  if(agTempoArr.length){
+    chart('chartTempoAgente','bar',{
+      labels:agTempoArr.map(a=>a.nome),
+      datasets:[{label:'Tempo médio (min)',data:agTempoArr.map(a=>a.media),backgroundColor:agTempoArr.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:0,borderRadius:5}]
+    },{indexAxis:'y'});
+  }
+
+  // === Chart: Evolução mensal Pets e Acumuladores ===
+  const porMes={};
+  v.forEach(x=>{
+    const mes=(x.data_criacao||'').substring(0,7);
+    if(!mes)return;
+    if(!porMes[mes])porMes[mes]={pets:0,acum:0};
+    if(x.possui_pets)porMes[mes].pets++;
+    if(x.acumulador)porMes[mes].acum++;
+  });
+  const meses=Object.keys(porMes).sort();
+  if(meses.length){
+    chart('chartEvolucaoExtras','line',{
+      labels:meses,
+      datasets:[
+        {label:'Pets',data:meses.map(m=>porMes[m].pets),borderColor:'#fb923c',backgroundColor:'rgba(251,146,60,.1)',fill:true,tension:.3,pointRadius:3},
+        {label:'Acumuladores',data:meses.map(m=>porMes[m].acum),borderColor:'#f87171',backgroundColor:'rgba(248,113,113,.1)',fill:true,tension:.3,pointRadius:3},
+      ]
+    });
+  }
+
+  // === Tabela: Acumuladores ===
+  const acumVisitas=v.filter(x=>x.acumulador).slice(0,100);
+  ge('acumCount').textContent=acumVisitas.length+' registros';
+  const tbodyAcum=ge('tbodyAcumuladores');
+  tbodyAcum.innerHTML=acumVisitas.length?acumVisitas.map(x=>{
+    const dep=tDep(x);
+    const petStr=x.possui_pets?(x.pets_cao?'🐕':'')+(x.pets_gato?' 🐈':'')+(x.pets_outros?' '+x.pets_outros:''):'—';
+    return`<tr>
+      <td style="white-space:nowrap;font-size:11px">${x.data_criacao?fmtD(x.data_criacao.substring(0,10)):'—'}</td>
+      <td>${x._nome||'—'}</td>
+      <td style="color:var(--text-primary)">${x.logradouro||'—'}</td>
+      <td>${x.numero||'—'}</td>
+      <td><span class="badge badge-blue">${x._terr?'Terr. '+x._terr:'—'}</span></td>
+      <td>${petStr}</td>
+      <td style="font-family:var(--mono)">${dep}</td>
+      <td>${x.latitude?'📍':'—'}</td>
+    </tr>`}).join(''):'<tr><td colspan="8" class="empty">Nenhum acumulador registrado</td></tr>';
+
+  // === Tabela: Top ruas com pets ===
+  const ruasPets={};
+  v.filter(x=>x.possui_pets).forEach(x=>{
+    const key=(x.logradouro||'Desconhecido')+'||'+(x._terr||'');
+    if(!ruasPets[key])ruasPets[key]={logradouro:x.logradouro||'—',terr:x._terr||'—',total:0,caes:0,gatos:0};
+    ruasPets[key].total++;
+    if(x.pets_cao)ruasPets[key].caes++;
+    if(x.pets_gato)ruasPets[key].gatos++;
+  });
+  const topPets=Object.values(ruasPets).sort((a,b)=>b.total-a.total).slice(0,15);
+  const tbodyPets=ge('tbodyTopPets');
+  tbodyPets.innerHTML=topPets.length?topPets.map((r,i)=>`<tr>
+    <td><span class="rank ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span></td>
+    <td style="color:var(--text-primary)">${r.logradouro}</td>
+    <td><span class="badge badge-blue">${r.terr!=='—'?'Terr. '+r.terr:'—'}</span></td>
+    <td><span class="badge badge-purple">${r.total}</span></td>
+    <td>${r.caes}</td>
+    <td>${r.gatos}</td>
+  </tr>`).join(''):'<tr><td colspan="6" class="empty">Nenhum pet registrado</td></tr>';
+}
+
+// ============================================================
+// CHART HELPER
+// ============================================================
+function chart(id,type,data,extra={}){
+  if(charts[id])charts[id].destroy();
+  const c=document.getElementById(id);if(!c)return;
+  const base={responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{labels:{color:'#8a9dc0',font:{family:"'DM Sans'",size:11},boxWidth:10,padding:14}}},
+    scales:type==='doughnut'?{}:{x:{ticks:{color:'#4e6488',font:{size:10}},grid:{color:'rgba(30,45,74,.5)'}},y:{ticks:{color:'#4e6488',font:{size:10}},grid:{color:'rgba(30,45,74,.5)'}}}
+  };
+  charts[id]=new Chart(c,{type,data,options:merge(base,extra)});
+}
+
+// ============================================================
+// TABS
+// ============================================================
+document.addEventListener('click',e=>{
+  const t=e.target.closest('.tab');if(!t)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  ge('tab-'+t.dataset.tab)?.classList.add('active');
+  if(t.dataset.tab==='mapa')setTimeout(()=>{if(leafMap)leafMap.invalidateSize();_renderMapaHeat();},200);
+});
+
+// ============================================================
+// UTILS
+// ============================================================
+function ge(id){return document.getElementById(id)}
+function gv(id){return ge(id).value}
+function tDep(v){return(v.depositos_a1||0)+(v.depositos_a2||0)+(v.depositos_b||0)+(v.depositos_c||0)+(v.depositos_d1||0)+(v.depositos_d2||0)+(v.depositos_e||0)}
+function sumF(arr,f){return arr.reduce((s,x)=>s+(x[f]||0),0)}
+function fmtD(s){if(!s)return'—';const[y,m,d]=s.split('-');return`${d}/${m}`}
+function merge(a,b){const r={...a};for(const k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k]))r[k]=merge(r[k]||{},b[k]);else r[k]=b[k]}return r}
+function anim(id,target){
+  const el=ge(id);const st=parseInt(el.textContent)||0;const dur=500;const t0=performance.now();
+  (function u(now){const p=Math.min((now-t0)/dur,1);const e=1-Math.pow(1-p,3);el.textContent=Math.round(st+(target-st)*e).toLocaleString('pt-BR');if(p<1)requestAnimationFrame(u)})(t0);
+}
+</script>
+</body>
+</html>
