@@ -1,4 +1,4 @@
-# 🦟 ACE Lagoa Santa — Painel de Monitoramento v2.0
+# 🦟 ACE Lagoa Santa — Painel de Monitoramento v4.0
 
 > Dashboard web para acompanhamento em tempo real das atividades dos Agentes de Combate às Endemias (ACE) do município de Lagoa Santa/MG.
 
